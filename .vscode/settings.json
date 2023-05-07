@@ -1,0 +1,15 @@
+{
+    "files.associations": {
+        "x86.h": "c",
+        "proc.h": "c",
+        "memlayout.h": "c",
+        "mmu.h": "c",
+        "sleeplock.h": "c",
+        "string_view": "c",
+        "__locale": "c",
+        "__string": "c",
+        "string": "c",
+        "ios": "c",
+        "algorithm": "c"
+    }
+}
