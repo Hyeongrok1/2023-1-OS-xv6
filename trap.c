@@ -81,6 +81,7 @@ trap(struct trapframe *tf)
     // call page fault handler
     // If success, break
     if (page_fault_handler(tf->err & 2) != -1) break;
+    else exit();
   //PAGEBREAK: 13
   default:
     if(myproc() == 0 || (tf->cs&3) == 0){
