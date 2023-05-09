@@ -10,6 +10,9 @@
         "__string": "c",
         "string": "c",
         "ios": "c",
-        "algorithm": "c"
+        "algorithm": "c",
+        "file.h": "c",
+        "stat.h": "c",
+        "types.h": "c"
     }
 }
