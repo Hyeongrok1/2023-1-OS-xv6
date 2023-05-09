@@ -284,15 +284,19 @@ fork(void)
     // If the memory mep area is owned by current process
     // and is used
     // we should copy that memory map area
-    if (curproc == mmap_areas[i].p && (mmap_status_flag[i] != 0)) {
-      
+    if (curproc == mmap_areas[i].p && mmap_status_flag[i] != 0) {
+
+      // Find the empty mmap_area
       int mmap_arr_idx = 0;
       for (mmap_arr_idx = 0; mmap_arr_idx < 64; mmap_arr_idx++) {
-        if (mmap_status_flag[i] == 0) {
+        if (mmap_status_flag[mmap_arr_idx] == 0) {
           break;
         }
       }
-      if (mmap_arr_idx == 64) continue;
+      if (mmap_arr_idx == 64) {
+        cprintf("Fork error: there is no empty mmap_area\n");
+        return -1;
+      }
       mmap_areas[mmap_arr_idx].addr = mmap_areas[i].addr;
       mmap_areas[mmap_arr_idx].f = mmap_areas[i].f;
       mmap_areas[mmap_arr_idx].length = mmap_areas[i].length;
@@ -309,7 +313,7 @@ fork(void)
       struct file *pfile = mmap_areas[i].f;
       int prot = mmap_areas[i].prot;
 
-      if ((flags == 0 && mmap_status_flag[i] == 1) || flags == MAP_POPULATE) { // private file mapping with MAP_POPULATE
+      if (mmap_status_flag[i] == 1 && (flags == 0 || flags == MAP_POPULATE)) { // private file mapping with MAP_POPULATE
         pfile->off = offset;
         char *mem = 0;
         int i = 0;
@@ -329,23 +333,19 @@ fork(void)
         }
         mmap_status_flag[mmap_arr_idx] = 1;
       }
-      else if ((flags == MAP_ANONYMOUS && mmap_status_flag[i] == 1) || flags == (MAP_ANONYMOUS | MAP_POPULATE)) { // private anonymous mapping with MAP_POPULATE
-          
+      else if (mmap_status_flag[i] == 1 && (flags == MAP_ANONYMOUS && flags == (MAP_ANONYMOUS | MAP_POPULATE))) { // private anonymous mapping with MAP_POPULATE
           int i = 0;
           char *mem = 0;
           for (i = 0; i < length; i += PGSIZE) {
             mem = kalloc();
             if (mem == 0) return 0;
             memset(mem, 0, PGSIZE);
-
-            fileread(pfile, mem, PGSIZE);
             
             // Create PTEs for virtual addresses starting at va that refer to
             // physical addresses starting at pa. va and size might not
             // be page-aligned.
             // mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm) 
             mappages(curproc->pgdir, (void *) (addr + i), PGSIZE, V2P(mem), prot | PTE_U);
-          
         }
         mmap_status_flag[mmap_arr_idx] = 1;
       }
@@ -860,27 +860,14 @@ mmap(uint addr, int length, int prot, int flags, int fd, int offset)
   addr = addr + MMAPBASE;
   struct proc *curproc = myproc();
 
+  // PARAMETER ERROR HANDLING
+  
   // Fails if fd is stdin or stdout, or length is 0, or offset is greater than PGSIZE
   // Also, length is a multiple of page size
-  if (fd == 0 || fd == 1 || length == 0 || length%PGSIZE != 0 || offset < 0 || offset > PGSIZE) {
-    return -1;
-  }
-  // Prot can be PROT_READ or PROT_READ|PROT_WRITE
-  if (prot != PROT_READ && prot != (PROT_READ | PROT_WRITE)) {
-    return -2;
-  }
+  if (fd == 0 || fd == 1 || length == 0 || length%PGSIZE != 0 || offset < 0 || offset > PGSIZE) return 0;
 
-  // pfil allocation
-  struct file *pfile = 0;
-  // ANONYMOUS
-  if (fd == -1) { 
-    pfile = 0;
-  }
-  // POPULATE
-  else { 
-    if (fd < 0) return -3;
-    pfile = curproc->ofile[fd];
-  }
+  // Prot can be PROT_READ or PROT_READ|PROT_WRITE, else INVALID
+  if (prot != PROT_READ && prot != (PROT_READ | PROT_WRITE)) return 0;
 
   // FLAGS
   //    MAP_ANONYMOUS: anonymous mapping
@@ -888,36 +875,57 @@ mmap(uint addr, int length, int prot, int flags, int fd, int offset)
   //     MAP_POPULATE: allocate physical page & make page table for whole mapping area
   //  no MAP_POPULATE: just record its mapping area
 
+  // When flag is INVALID
+  if (flags != 0 && flags != MAP_ANONYMOUS && flags != MAP_POPULATE && flags != (MAP_ANONYMOUS | MAP_POPULATE)) return 0;
+
   // anonymous mapping, but offset is not 0 and fd is not -1 => INVALID
-  if ((flags & MAP_ANONYMOUS) && (offset != 0 || fd != -1)) return -4;
+  if ((flags & MAP_ANONYMOUS) && (offset != 0 || fd != -1)) return 0;
 
   // not anonymous, but the fd is -1
-  if ((flags & MAP_ANONYMOUS) == 0 && fd == -1) return -5;
+  if ((flags & MAP_ANONYMOUS) == 0 && fd == -1) return 0;
   
   // fd is not given for file mappings, but offset is not 0
-  if (fd != -1 && offset != 0) return -1;
+  if (fd == -1 && offset != 0) return 0;
+
+  // pfile allocation
+  struct file *pfile = 0;
+  // ANONYMOUS
+  if (fd == -1) { 
+    pfile = 0;
+  }
+  // NOT ANONYMOUS
+  else { 
+    if (fd < 0) return 0;
+    pfile = curproc->ofile[fd];
+  }
 
   // file mapping, but file type is not FD_INODE,
   // PROT_READ but not readable
   // PROT_WRITE but not writable      
   // => INVALID
   if (!(flags & MAP_ANONYMOUS)) {
-    if (pfile->type != FD_INODE) return -6;
-    if ((prot & PROT_READ) && !pfile->readable) return -7;
-    if ((prot & PROT_WRITE) && !pfile->writable) return -8;
+    if (pfile->type != FD_INODE) return 0;
+    if ((prot & PROT_READ) && !pfile->readable) return 0;
+    if ((prot & PROT_WRITE) && !pfile->writable) return 0;
   }
 
+  // memory mapping
   int mmap_arr_idx = 0;
   uint tmp_addr = 0;
   uint tmp_end_addr = 0;
+  uint addr_end = addr + length;
   for (mmap_arr_idx = 0; mmap_arr_idx < 64; mmap_arr_idx++) {
-    // Find the using areas
+    // Find already using areas
     if (mmap_status_flag[mmap_arr_idx] != 0) {
+      // The start address of already using area
       tmp_addr = mmap_areas[mmap_arr_idx].addr;
+      // The end address of already using area
       tmp_end_addr = mmap_areas[mmap_arr_idx].addr + mmap_areas[mmap_arr_idx].length;
 
       // The mapping area is overlapped => INVALID
-      if (!(addr + length <= tmp_addr && tmp_end_addr <= addr + length)) return -1;
+      if (addr_end <= tmp_addr) continue;
+      else if (tmp_end_addr <= addr) continue;
+      else return 0;
     }
   }
 
@@ -929,7 +937,7 @@ mmap(uint addr, int length, int prot, int flags, int fd, int offset)
     }
   }
   // If Not Found
-  if (mmap_arr_idx == 64) return -9; 
+  if (mmap_arr_idx == 64) return 0; 
 
   // If ANONYMOUS, pfile is 0
   if (pfile == 0) mmap_areas[mmap_arr_idx].f = 0;
@@ -948,12 +956,12 @@ mmap(uint addr, int length, int prot, int flags, int fd, int offset)
 
   if (flags == 0) {
     // file mapping, just record its mapping area
-    // Page fault
+    // There will be Page fault
     return addr;
   }
   else if (flags == MAP_ANONYMOUS) { // private file mapping without MAP_POPULATE
     // Anonymous mapping, just record its mapping area
-    // Page fault
+    // There will be Page fault
     return addr;
   }
   else if (flags == MAP_POPULATE) { // private file mapping with MAP_POPULATE
@@ -966,7 +974,7 @@ mmap(uint addr, int length, int prot, int flags, int fd, int offset)
     // For example, if length is 8192, there will be 2 pages
     for (i = 0; i < length; i += PGSIZE) {
       // allocate
-      if ((mem = kalloc()) == 0) return -10;  
+      if ((mem = kalloc()) == 0) return 0;  
       // fill 0 to the page
       memset(mem, 0, PGSIZE);
 
@@ -988,7 +996,7 @@ mmap(uint addr, int length, int prot, int flags, int fd, int offset)
       int i = 0;
       for (i = 0; i < length; i += PGSIZE) {
         // allocate
-        if ((mem = kalloc()) == 0) return -11;
+        if ((mem = kalloc()) == 0) return 0;
         // fill 0 to the page
         memset(mem, 0, PGSIZE);
 
@@ -1009,55 +1017,66 @@ mmap(uint addr, int length, int prot, int flags, int fd, int offset)
 
 int page_fault_handler(uint error) {
   uint va;
-
-  // The page fault virtual address
+  struct proc *curproc = myproc();
+  // get the page fault virtual address
   if ((va = rcr2()) < 0) {
-    return -1;
+    cprintf("Page fault: cannot get the page fault virtual address\n");
+    exit();
   }
   
+  // find mmap_area of the faulted address
   int mmap_arr_idx = 0;
   for (mmap_arr_idx = 0; mmap_arr_idx < 64; mmap_arr_idx++) {
     // If virtual address is in the range of certain mmap_area, and the process is the same
     // break the loop
     if (mmap_areas[mmap_arr_idx].addr <= va 
       && va < mmap_areas[mmap_arr_idx].addr + mmap_areas[mmap_arr_idx].length 
-      && mmap_areas[mmap_arr_idx].p == myproc()) {
+      && mmap_areas[mmap_arr_idx].p == curproc) {
       break;
     }
   }
-  // faulted address has no corresponding mmap_area
-  if (mmap_arr_idx == 64) return -1;
+  // If faulted address has no corresponding mmap_area
+  if (mmap_arr_idx == 64) {
+    cprintf("Page fault: faulted address has no corresponding mmap_area\n");
+    exit();
+  }
 
-  // cannot write, but tried to write
-  if ((mmap_areas[mmap_arr_idx].prot & PROT_WRITE) != 2 && (error & 2) == 1) { 
-    return -1;
+  // Cannot read, but tried to read
+  if ((mmap_areas[mmap_arr_idx].prot & PROT_READ) != 1 && (error & 2) == 0) {
+    cprintf("Page fault: cannot read, but tried to read\n");
+    exit();
+  }
+  // Cannot write, but tried to write
+  if ((mmap_areas[mmap_arr_idx].prot & PROT_WRITE) != 2 && (error & 2) == 1) {
+    cprintf("Page fault: cannot write, but tried to write\n");
+    exit();
   }
 
   // 0: empty
   // 1: private mapping with MAP_POPULATE
   // -1: private mapping without MAP_POPULATE
-  // if (mmap_status_flag[mmap_arr_idx] == -1) {
-  //   cprintf("Cannot access the page\n");
-  //   return -1;
-  // }
   if (mmap_status_flag[mmap_arr_idx] == 1) {
-    cprintf("Already using page\n");
-    return -1;
+    cprintf("Page fault: This page is not available\n");
+    exit();
   }
-  if (mmap_status_flag[mmap_arr_idx] == 0) return -1;
+  if (mmap_status_flag[mmap_arr_idx] == 0) exit();
 
+  // For only one page according to faulted address, allocate new physical page, and fill new page with 0
   // if status flag is 0(empty), it is possible to allocate mmap_area
   char *mem = 0;  
-  if ((mem = kalloc()) == 0) return 0;
+  if ((mem = kalloc()) == 0) exit();
   memset(mem, 0, PGSIZE);
 
-  fileread(mmap_areas[mmap_arr_idx].f, mem, PGSIZE);
+  if ((mmap_areas[mmap_arr_idx].flags & MAP_ANONYMOUS) == 0) {
+    mmap_areas[mmap_arr_idx].f->off = mmap_areas[mmap_arr_idx].offset;
+    fileread(mmap_areas[mmap_arr_idx].f, mem, PGSIZE);
+  }
         
   // Create PTEs for virtual addresses starting at va that refer to
   // physical addresses starting at pa. va and size might not
   // be page-aligned.
   // mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm) 
-  mappages(myproc()->pgdir, (void *) va, PGSIZE, V2P(mem), mmap_areas[mmap_arr_idx].prot | PTE_U);
+  mappages(curproc->pgdir, (void *) va, PGSIZE, V2P(mem), mmap_areas[mmap_arr_idx].prot | PTE_U);
   mmap_status_flag[mmap_arr_idx] = 1;
   return 1;
 }
@@ -1088,8 +1107,8 @@ munmap(uint addr) {
   // Free the pages and page tables
   for(int i = 0; i < length; i += PGSIZE) {
     // If there are no pte, it fails
-    if ((pte = walkpgdir(curproc->pgdir, (char *)(va + i), 0)) == 0) {
-      return -2;
+    if ((pte = walkpgdir(curproc->pgdir, (char *) (va + i), 0)) == 0) {
+      return -1;
     }
     
     if((*pte & PTE_P) == 1){          // If PTE is present
