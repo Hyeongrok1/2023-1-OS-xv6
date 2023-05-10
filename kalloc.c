@@ -97,12 +97,12 @@ kalloc(void)
 
 // Returns the current number of free memory pages
 int
-freemem_count(void) {
-  int free_mem_num = 0;
+freemem(void) {
+  int free_memory_pages = 0;
   struct run *r = kmem.freelist;
   while (r != 0) {
-    free_mem_num++;
+    free_memory_pages++;
     r = r->next;
   }
-  return free_mem_num;
+  return free_memory_pages;
 }

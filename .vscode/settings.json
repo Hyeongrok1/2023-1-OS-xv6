@@ -13,6 +13,9 @@
         "algorithm": "c",
         "file.h": "c",
         "stat.h": "c",
-        "types.h": "c"
+        "types.h": "c",
+        "memory": "c",
+        "__mutex_base": "c",
+        "spinlock.h": "c"
     }
 }

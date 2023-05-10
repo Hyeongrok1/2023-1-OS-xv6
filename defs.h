@@ -68,7 +68,7 @@ char*           kalloc(void);
 void            kfree(char*);
 void            kinit1(void*, void*);
 void            kinit2(void*, void*);
-int             freemem_count(void);
+int             freemem(void);
 
 // kbd.c
 void            kbdintr(void);
@@ -106,7 +106,6 @@ int             pipewrite(struct pipe*, char*, int);
 // proc.c
 int             cpuid(void);
 void            exit(void);
-int            freemem(void);
 int             fork(void);
 int		        getnice(int);
 int		        setnice(int, int);

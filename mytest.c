@@ -47,21 +47,10 @@ int main()
 	printf(1, "===============Private file mapping without MAP_POPULATE==================\n");
 	printf(1, "free memory number: %d\n", freemem());				// number of free space => ?
 	memory_area = (char *) mmap(0, 8192, PROT_READ, 0, fd, 0);
-	printf(1, "mmap result (first four letters): %s\n", memory_area);	// print memory mapped file
+	printf(1, "mmap result (first four letters): %c%c%c%c\n", memory_area[0], memory_area[1], memory_area[2], memory_area[3]);	// print memory mapped file
 	printf(1, "free memory number: %d\n", freemem());				// number of free space
 	printf(1, "munmap result: %d\n", munmap((uint) memory_area));		
 	printf(1, "free memory number: %d\n", freemem());
-
-	printf(1, "===============================fork=======================================\n");
-	printf(1, "free memory number: %d\n", freemem());
-	memory_area = (char *) mmap(0, 8192, PROT_READ, MAP_POPULATE, fd, 0);
-	printf(1, "mmap result (first four letters): %c%c%c%c\n\n", memory_area[0], memory_area[1], memory_area[2], memory_area[3]);
-	printf(1, "free memory number before wait: %d\n", freemem());
-	fork();
-	printf(1, "mmap result (first four letters): %c%c%c%c\n", memory_area[0], memory_area[1], memory_area[2], memory_area[3]);
-	printf(1, "free memory number during fork: %d\n", freemem());
-	wait();
-	printf(1, "free memory number after wait: %d\n", freemem());
 
 	// memory overlapped situation
 	printf(1, "============================memory overlapped=============================\n");
@@ -75,6 +64,16 @@ int main()
 	printf(1, "munmap result: %d\n", munmap((uint) memory_area2));
 	printf(1, "free memory number: %d\n", freemem());
 
+	printf(1, "===============================fork=======================================\n");
+	printf(1, "free memory number: %d\n", freemem());
+	memory_area = (char *) mmap(0, 8192, PROT_READ, MAP_POPULATE, fd, 0);
+	printf(1, "mmap result (first four letters): %c%c%c%c\n\n", memory_area[0], memory_area[1], memory_area[2], memory_area[3]);
+	printf(1, "free memory number before wait: %d\n", freemem());
+	fork();
+	printf(1, "mmap result (first four letters): %c%c%c%c\n", memory_area[0], memory_area[1], memory_area[2], memory_area[3]);
+	printf(1, "free memory number during fork: %d\n", freemem());
+	wait();
+	printf(1, "free memory number after wait: %d\n", freemem());
 	
 	exit();
 }
