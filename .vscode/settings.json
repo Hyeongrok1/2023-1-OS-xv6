@@ -16,6 +16,7 @@
         "types.h": "c",
         "memory": "c",
         "__mutex_base": "c",
-        "spinlock.h": "c"
+        "spinlock.h": "c",
+        "condition_variable": "c"
     }
 }

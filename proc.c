@@ -315,8 +315,8 @@ fork(void)
 
       // If status is 1 (already memory mapped)
       // do the same thing to the child
-      if (mmap_status_flag[i] == 1 && (flags == 0 || flags == MAP_POPULATE)) { // private file mapping (flag is 0 or MAP_POPULATE)
-        pfile->off = offset;
+      if (mmap_status_flag[i] == 1) {
+        if (flags == 0 || flags == MAP_POPULATE) pfile->off = offset;
         char *mem = 0;
         int i = 0;
         for (i = 0; i < length; i += PGSIZE) {
@@ -328,34 +328,12 @@ fork(void)
           for (int j = 0; j < PGSIZE; j++) {
             mem[j] = memory_addr[i+j];
           }
-          // if (fileread(pfile, mem, PGSIZE) == -1) return -1;
           
           // Create PTEs for virtual addresses starting at va that refer to
           // physical addresses starting at pa. va and size might not
           // be page-aligned.
           // mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm) 
           mappages(np->pgdir, (void *) (addr + i), PGSIZE, V2P(mem), prot | PTE_U);
-        }
-        mmap_status_flag[mmap_area_idx] = 1;
-      }
-      else if (mmap_status_flag[i] == 1 && (flags == MAP_ANONYMOUS && flags == (MAP_ANONYMOUS | MAP_POPULATE))) { // private anonymous mapping
-          char *mem = 0;
-          int i = 0;
-          for (i = 0; i < length; i += PGSIZE) {
-            if ((mem = kalloc()) == 0) return 0;
-            // Fill the page with 0
-            memset(mem, 0, PGSIZE);
-
-            // copy the memory area
-            char *memory_addr = (char *) mmap_areas[mmap_area_idx].addr;
-            for (int j = 0; j < PGSIZE; j++) {
-              mem[j] = memory_addr[i+j];
-            }
-            // Create PTEs for virtual addresses starting at va that refer to
-            // physical addresses starting at pa. va and size might not
-            // be page-aligned.
-            // mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm) 
-            mappages(np->pgdir, (void *) (addr + i), PGSIZE, V2P(mem), prot | PTE_U);
         }
         mmap_status_flag[mmap_area_idx] = 1;
       }
@@ -904,8 +882,8 @@ mmap(uint addr, int length, int prot, int flags, int fd, int offset)
   // => INVALID
   if (!(flags & MAP_ANONYMOUS)) {
     if (pfile->type != FD_INODE) return 0;
-    if ((prot & PROT_READ) && !pfile->readable) return 0;
-    if ((prot & PROT_WRITE) && !pfile->writable) return 0;
+    if ((prot & PROT_READ) == PROT_READ && !pfile->readable) return 0;
+    if ((prot & PROT_WRITE) == PROT_WRITE && !pfile->writable) return 0;
   }
 
   // memory mapping
