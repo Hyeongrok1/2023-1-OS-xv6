@@ -1,6 +1,6 @@
 # xv6_project
 xv6 운영체제는 MIT에서 개발한 Unix-like 교육용 운영체제입니다.
-운영체제 수업에서 과제용으로 사용되었습니다.
+성균관대 운영체제 수업에서 과제용으로 사용되었습니다.
 
 ## Project 0 - Booting (10/10) pt
 Project 0의 내용은 간단하게 xv6 운영체제를 실행하고 boot message를 추가하는 것입니다.<br>
@@ -24,3 +24,17 @@ CFS는 프로세스에 할당된 weight에 따라 CPU를 할당합니다. 발전
 vruntime은 각 프로세스가 weight에 비례해서 얼마나 실행되었는지 나타내는 값으로, process가 공평하게 CPU를 할당받았는지 비교하기 위해 쓰입니다.<br>
 
 ## Project 3- Virtual Memory (25/25) pt
+Project 3의 내용은 mmap(), munmap(), freemem() 시스템 콜, Page fault handler를 구현하는 것입니다. <br>
+* uint mmap(uint addr, int length, int prot, int flags, int fd, int offset)
+* munmap(addr)
+* int freemem()
+
+mmap 시스템 콜은 특정 길이의 page를 할당 받아서 시작 주소를 반환하는 시스템 콜입니다. fd에 file descriptor를 넣으면 해당 파일이 메모리 공간에 할당됩니다. <br>
+munmap 시스템 콜은 mmap으로 할당된 메모리 공간을 풀어주는 기능을 합니다. <br>
+freemem 시스템 콜은 사용하지 않는 page 개수를 세서 반환하는 시스템 콜입니다. <br>
+
+Page fault handler는 가상 메모리가 실제 physical 페이지와 page table이 할당되어 있지 않았을 때 접근될 경우, physical 페이지와 page table을 실제로 할당하는 역할을 합니다. <br>
+
+그 외에 fork로 새 프로세스가 생성되면 부모 프로세스의 mmap 상태를 그대로 복사합니다. 
+
+Project 3까지 만점을 받았습니다. 학기 중에는 다른 학생들의 표절을 막기 위해 repository를 private으로 바꿀 것입니다.
