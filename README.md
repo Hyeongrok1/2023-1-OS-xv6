@@ -33,7 +33,7 @@ mmap 시스템 콜은 특정 길이의 page를 할당 받아서 시작 주소를
 munmap 시스템 콜은 mmap으로 할당된 메모리 공간을 풀어주는 기능을 합니다. <br>
 freemem 시스템 콜은 사용하지 않는 page 개수를 세서 반환하는 시스템 콜입니다. <br>
 
-Page fault handler는 가상 메모리가 실제 physical 페이지와 page table이 할당되어 있지 않았을 때 접근될 경우, physical 페이지와 page table을 실제로 할당하는 역할을 합니다. <br>
+Page fault handler는 가상 메모리에 실제 physical 페이지와 page table이 매핑되어 있지 않을 상태로 주소가 접근될 경우, physical 페이지와 page table을 실제로 할당하는 역할을 합니다. <br>
 
 그 외에 fork로 새 프로세스가 생성되면 부모 프로세스의 mmap 상태를 그대로 복사합니다. 
 
